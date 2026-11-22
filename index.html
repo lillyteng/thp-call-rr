@@ -426,6 +426,115 @@
   @keyframes m-fade { from { opacity: 0; } to { opacity: 1; } }
   @keyframes m-up   { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
+  /* ---- Find rotation by task view ---- */
+  .view-search {
+    padding: 16px 14px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .view-search-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .view-search-header h1 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .back-btn {
+    background: transparent;
+    border: none;
+    color: #C00000;
+    font-size: 17px;
+    font-weight: 800;
+    padding: 6px 8px 6px 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .search-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  .search-stage label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+  .search-stage select {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 15px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b6b70' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+    box-sizing: border-box;
+  }
+  .search-stage select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(13,46,58,0.15);
+  }
+  .search-stage select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .search-result {
+    margin-top: 8px;
+    min-height: 0;
+  }
+  .search-result-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid #F4B183;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .search-result-rotation {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .search-result-meta {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .search-result-meta b { color: var(--text); font-weight: 600; }
+  .search-result-empty {
+    text-align: center;
+    padding: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .search-reset-btn {
+    width: 100%;
+    margin-top: 6px;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
   /* ---- Selector controls ---- */
   .controls {
     background: var(--card);
@@ -911,6 +1020,27 @@
 </section>
 
 <main id="taskList"></main>
+
+<section class="view-search" id="searchView" hidden>
+  <div class="view-search-header">
+    <button class="back-btn" id="backFromSearch">‹ Back</button>
+    <h1>Find rotation by task</h1>
+  </div>
+  <div class="search-stage">
+    <label for="searchTask">1. Task</label>
+    <select id="searchTask"><option value="">— Select a task —</option></select>
+  </div>
+  <div class="search-stage">
+    <label for="searchDay">2. Day</label>
+    <select id="searchDay" disabled><option value="">— Pick a task first —</option></select>
+  </div>
+  <div class="search-stage">
+    <label for="searchTime">3. Time</label>
+    <select id="searchTime" disabled><option value="">— Pick a day first —</option></select>
+  </div>
+  <div id="searchResult" class="search-result"></div>
+  <button class="search-reset-btn" id="searchReset">Reset search</button>
+</section>
 </div>
 
 <div class="pdf-viewer" id="pdfViewer" hidden>
@@ -925,8 +1055,8 @@
 <div class="menu-overlay" id="menuOverlay" hidden>
   <div class="menu-sheet">
     <div class="menu-section-label">Reference PDFs</div>
+    <button class="menu-item" data-action="search">Find rotation by task</button>
     <button class="menu-item" data-action="pdf-rotation">THP Call RR PDF (by rotation)</button>
-    <button class="menu-item" data-action="pdf-source">Ivan Diamond's original source PDF</button>
     <div class="menu-version" id="menuVersion">VERSION ?</div>
     <button class="menu-item cancel" data-action="cancel">Cancel</button>
   </div>
@@ -1492,14 +1622,155 @@ menuOverlay.querySelectorAll('.menu-item').forEach(item => {
       e.preventDefault();
       closeMenu();
       openPdfViewer('THP-Call-RR.pdf', 'THP Call RR — by rotation');
-    } else if (action === 'pdf-source') {
+    } else if (action === 'search') {
       e.preventDefault();
       closeMenu();
-      openPdfViewer('THP-Call-Reporting-Responsibilities-source.pdf',
-                    "Ivan Diamond's original source PDF");
+      openSearchView();
     }
   });
 });
+
+// ---------- Find rotation by task ----------
+const searchTaskSel   = document.getElementById('searchTask');
+const searchDaySel    = document.getElementById('searchDay');
+const searchTimeSel   = document.getElementById('searchTime');
+const searchResultEl  = document.getElementById('searchResult');
+const searchViewEl    = document.getElementById('searchView');
+const controlsEl      = document.getElementById('controlsSection');
+const taskListEl      = document.getElementById('taskList');
+
+function setSearchOptions(sel, opts, placeholder) {
+  sel.innerHTML = '';
+  const ph = document.createElement('option');
+  ph.value = '';
+  ph.textContent = placeholder;
+  sel.appendChild(ph);
+  for (const [val, label] of opts) {
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  }
+}
+
+function clearSearchResult() { searchResultEl.innerHTML = ''; }
+
+function uniqueSearchTasks() {
+  const set = new Set();
+  for (const r of APP_DATA.rows) if (r.task) set.add(r.task);
+  return [...set].sort((a, b) =>
+    a.replace(/^\*/, '').toLowerCase().localeCompare(b.replace(/^\*/, '').toLowerCase()));
+}
+
+function daysForSearchTask(task) {
+  const days = new Set();
+  for (const r of APP_DATA.rows) {
+    if (r.task === task && r.day) days.add(r.day);
+  }
+  return [...days];
+}
+
+function timesForSearchTaskDay(task, day) {
+  const times = new Set();
+  for (const r of APP_DATA.rows) {
+    if (r.task === task && r.day === day) times.add(r.time || '(no time)');
+  }
+  return [...times].sort((a, b) => compareTimes(a, b));
+}
+
+function resultsForSearch(task, day, time) {
+  return APP_DATA.rows.filter(r =>
+    r.task === task && r.day === day && (r.time || '(no time)') === time
+  );
+}
+
+function populateSearchTaskOptions() {
+  const tasks = uniqueSearchTasks();
+  setSearchOptions(searchTaskSel, tasks.map(t => [t, t]), '— Select a task —');
+}
+
+function onSearchTaskChange() {
+  clearSearchResult();
+  searchDaySel.value = '';
+  searchTimeSel.value = '';
+  searchTimeSel.disabled = true;
+  setSearchOptions(searchTimeSel, [], '— Pick a day first —');
+  if (!searchTaskSel.value) {
+    setSearchOptions(searchDaySel, [], '— Pick a task first —');
+    searchDaySel.disabled = true;
+    return;
+  }
+  const days = daysForSearchTask(searchTaskSel.value);
+  setSearchOptions(searchDaySel, days.map(d => [d, d]), '— Select a day —');
+  searchDaySel.disabled = days.length === 0;
+}
+
+function onSearchDayChange() {
+  clearSearchResult();
+  searchTimeSel.value = '';
+  if (!searchTaskSel.value || !searchDaySel.value) {
+    setSearchOptions(searchTimeSel, [], '— Pick a day first —');
+    searchTimeSel.disabled = true;
+    return;
+  }
+  const times = timesForSearchTaskDay(searchTaskSel.value, searchDaySel.value);
+  setSearchOptions(searchTimeSel, times.map(t => [t, t]), '— Select a time —');
+  searchTimeSel.disabled = times.length === 0;
+}
+
+function onSearchTimeChange() {
+  clearSearchResult();
+  if (!searchTaskSel.value || !searchDaySel.value || !searchTimeSel.value) return;
+  const matches = resultsForSearch(searchTaskSel.value, searchDaySel.value, searchTimeSel.value);
+  if (matches.length === 0) {
+    searchResultEl.innerHTML = '<div class="search-result-empty">No rotation found for this combination.</div>';
+    return;
+  }
+  for (const m of matches) {
+    const card = document.createElement('div');
+    card.className = 'search-result-card';
+    const name = document.createElement('div');
+    name.className = 'search-result-rotation';
+    name.textContent = m.rotation;
+    card.appendChild(name);
+    const meta = document.createElement('div');
+    meta.className = 'search-result-meta';
+    let html = '';
+    html += '<div><b>Day:</b> ' + escapeHtml(m.day || '—') + '</div>';
+    if (m.shift_time) html += '<div><b>Shift time:</b> ' + escapeHtml(m.shift_time) + '</div>';
+    html += '<div><b>Unread time:</b> ' + escapeHtml(m.time || '—') + '</div>';
+    if (m.segment)  html += '<div><b>Segment:</b> '  + escapeHtml(m.segment)  + '</div>';
+    if (m.worklist) html += '<div><b>Worklist:</b> ' + escapeHtml(m.worklist) + '</div>';
+    if (m.comments) html += '<div style="margin-top:6px">' + escapeHtml(m.comments) + '</div>';
+    meta.innerHTML = html;
+    card.appendChild(meta);
+    searchResultEl.appendChild(card);
+  }
+}
+
+searchTaskSel.addEventListener('change', onSearchTaskChange);
+searchDaySel.addEventListener('change', onSearchDayChange);
+searchTimeSel.addEventListener('change', onSearchTimeChange);
+document.getElementById('searchReset').addEventListener('click', () => {
+  searchTaskSel.value = '';
+  onSearchTaskChange();
+});
+
+populateSearchTaskOptions();
+
+function openSearchView() {
+  if (controlsEl) controlsEl.hidden = true;
+  if (taskListEl) taskListEl.hidden = true;
+  searchViewEl.hidden = false;
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+function closeSearchView() {
+  searchViewEl.hidden = true;
+  if (controlsEl) controlsEl.hidden = false;
+  if (taskListEl) taskListEl.hidden = false;
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+document.getElementById('backFromSearch').addEventListener('click', closeSearchView);
 
 // ---------- in-app PDF viewer ----------
 const pdfViewer = document.getElementById('pdfViewer');
